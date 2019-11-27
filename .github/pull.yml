@@ -1,0 +1,14 @@
+version: "1"
+rules: # Array of rules
+  - base: master # Required. Target branch
+    upstream: vector-im:master # Required. Must be in the same fork network.
+    mergeMethod: hardreset # Optional, one of [none, merge, squash, rebase, hardreset], Default: none.
+  - base: release
+    upstream: master # Required. Can be a branch in the same forked repo.
+    mergeMethod: merge
+    assignees: # Optional
+      - joenas
+    reviewers: # Optional
+      - joenas
+      - yusf
+label: ":arrow_heading_down: pull" # Optional
