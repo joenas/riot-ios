@@ -5023,7 +5023,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.shareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "fad04925-f32c-449f-8d1f-936f1394dbc5";
+				PROVISIONING_PROFILE = "2adef4b3-48ca-4d94-8453-b97abebdf1d2";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Share Extension";
 				SKIP_INSTALL = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/$(PRODUCT_NAME)/SupportingFiles/RiotShareExtension-Bridging-Header.h";
@@ -5099,7 +5099,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.SiriIntents;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "b689e8ca-6c1a-461b-8e57-a7e97652fb4a";
+				PROVISIONING_PROFILE = "3f98b191-8b47-4e99-b87d-a87efc523d67";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Siri Intents";
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = "$(inherited)";
@@ -5240,7 +5240,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "Rumble Ad Hoc2";
+				PROVISIONING_PROFILE_SPECIFIER = "Rumble Ad Hoc";
 				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/$(PRODUCT_NAME)/SupportingFiles/Riot-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
