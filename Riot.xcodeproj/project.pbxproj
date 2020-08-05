@@ -5242,7 +5242,6 @@
 					};
 					F094A9BD1B78D8F000B1FBBF = {
 						CreatedOnToolsVersion = 6.2;
-						DevelopmentTeam = E6A3GRJ9KD;
 						LastSwiftMigration = 1020;
 						ProvisioningStyle = Manual;
 						TestTargetID = F094A9A11B78D8F000B1FBBF;
@@ -6551,11 +6550,7 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.shareExtension;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Share Extension: Ad Hoc";
 				SKIP_INSTALL = YES;
@@ -6598,11 +6593,7 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.shareExtension;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "2adef4b3-48ca-4d94-8453-b97abebdf1d2";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Share Extension";
@@ -6640,11 +6631,7 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.SiriIntents;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Siri Intents: Ad Hoc";
 				SKIP_INSTALL = YES;
@@ -6681,11 +6668,7 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.SiriIntents;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "3f98b191-8b47-4e99-b87d-a87efc523d67";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble Siri Intents";
@@ -6720,11 +6703,7 @@
 				);
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.nse;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble NSE AdHoc";
 				SKIP_INSTALL = YES;
@@ -6760,11 +6739,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MTL_FAST_MATH = YES;
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble.nse;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "Rumble NSE AdHoc";
 				SKIP_INSTALL = YES;
@@ -6909,13 +6884,9 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "Rumble AdHoc";
+				PROVISIONING_PROFILE_SPECIFIER = Rumble;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/$(PRODUCT_NAME)/SupportingFiles/Riot-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -6948,11 +6919,7 @@
 				OTHER_CFLAGS = "$(inherited)";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-<<<<<<< HEAD
-				PRODUCT_BUNDLE_IDENTIFIER = dev.never.rumble;
-=======
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PRODUCT_BUNDLE_IDENTIFIER)";
->>>>>>> master
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "fb2f9b1d-0733-454a-bb8a-8326f44ab6b5";
 				PROVISIONING_PROFILE_SPECIFIER = Rumble;

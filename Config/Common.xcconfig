@@ -17,8 +17,8 @@
 // Configuration settings file format documentation can be found at:
 // https://help.apple.com/xcode/#/dev745c5c974
 
-BUNDLE_DISPLAY_NAME = Element
+BUNDLE_DISPLAY_NAME = Rumble
 
-APPLICATION_GROUP_IDENTIFIER = group.im.vector
+APPLICATION_GROUP_IDENTIFIER = group.dev.never
 
-BASE_BUNDLE_IDENTIFIER = im.vector.app
+BASE_BUNDLE_IDENTIFIER = dev.never.rumble
