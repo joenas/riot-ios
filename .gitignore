@@ -33,4 +33,4 @@ Pods/
 fastlane/report.xml
 fastlane/Reports
 fastlane/README.md
-provisioning_profiles
+provisioning_profiles/

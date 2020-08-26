@@ -508,11 +508,11 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     [DecryptionFailureTracker sharedInstance].delegate = [Analytics sharedInstance];
     [[Analytics sharedInstance] start];
 
-    self.pushNotificationService = [PushNotificationService new];
-    self.pushNotificationService.delegate = self;
-    
     self.localAuthenticationService = [[LocalAuthenticationService alloc] initWithPinCodePreferences:[PinCodePreferences shared]];
 
+    self.pushNotificationService = [[PushNotificationService alloc] initWithPushNotificationManager:PushNotificationManager.shared];
+    self.pushNotificationService.delegate = self;
+    
     // Add matrix observers, and initialize matrix sessions if the app is not launched in background.
     [self initMatrixSessions];
     
@@ -536,7 +536,9 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
 
     // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
     // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
-
+    
+    [self.pushNotificationService applicationWillResignActive];
+    
     // Release MatrixKit error observer
     if (matrixKitErrorObserver)
     {
@@ -615,7 +617,13 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     [self refreshApplicationIconBadgeNumber];
 
     _isAppForeground = NO;
+<<<<<<< HEAD
 
+=======
+    
+    [self.pushNotificationService applicationDidEnterBackground];
+    
+>>>>>>> master
     // Analytics: Force to send the pending actions
     [[DecryptionFailureTracker sharedInstance] dispatch];
     [[Analytics sharedInstance] dispatch];
@@ -626,9 +634,6 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     NSLog(@"[AppDelegate] applicationWillEnterForeground");
 
     // Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
-
-    // Notify push notification service
-    [self.pushNotificationService applicationWillEnterForeground];
 
     // Force each session to refresh here their publicised groups by user dictionary.
     // When these publicised groups are retrieved for a user, they are cached and reused until the app is backgrounded and enters in the foreground again
@@ -643,6 +648,8 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
 - (void)applicationDidBecomeActive:(UIApplication *)application
 {
     NSLog(@"[AppDelegate] applicationDidBecomeActive");
+    
+    [self.pushNotificationService applicationDidBecomeActive];
     
     if ([self.localAuthenticationService shouldShowPinCode])
     {
@@ -1229,7 +1236,7 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
         [[NSNotificationCenter defaultCenter] postNotificationName:AppDelegateUniversalLinkDidChangeNotification object:nil];
     }
 
-    if ([webURL.path hasPrefix:@"/config"])
+    if ([webURL.path isEqualToString:@"/"])
     {
         return [self handleServerProvionningLink:webURL];
     }
@@ -1772,7 +1779,7 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
 
 - (void)parseServerProvionningLink:(NSURL*)link homeserver:(NSString**)homeserver identityServer:(NSString**)identityServer
 {
-    if ([link.path isEqualToString:@"/config/config"])
+    if ([link.path isEqualToString:@"/"])
     {
         NSURLComponents *linkURLComponents = [NSURLComponents componentsWithURL:link resolvingAgainstBaseURL:NO];
         for (NSURLQueryItem *item in linkURLComponents.queryItems)
@@ -1839,45 +1846,8 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
         {
             // Store this new session
             [self addMatrixSession:mxSession];
-
-            // Set the VoIP call stack (if supported).
-            id<MXCallStack> callStack;
-
-#ifdef MX_CALL_STACK_OPENWEBRTC
-            callStack = [[MXOpenWebRTCCallStack alloc] init];
-#endif
-#ifdef MX_CALL_STACK_ENDPOINT
-            callStack = [[MXEndpointCallStack alloc] initWithMatrixId:mxSession.myUser.userId];
-#endif
-#ifdef CALL_STACK_JINGLE
-            callStack = [[MXJingleCallStack alloc] init];
-#endif
-            if (callStack)
-            {
-                [mxSession enableVoIPWithCallStack:callStack];
-
-                // Setup CallKit
-                if ([MXCallKitAdapter callKitAvailable])
-                {
-                    BOOL isCallKitEnabled = [MXKAppSettings standardAppSettings].isCallKitEnabled;
-                    [self enableCallKit:isCallKitEnabled forCallManager:mxSession.callManager];
-
-                    // Register for changes performed by the user
-                    [[MXKAppSettings standardAppSettings] addObserver:self
-                                                           forKeyPath:@"enableCallKit"
-                                                              options:NSKeyValueObservingOptionNew
-                                                              context:NULL];
-                }
-                else
-                {
-                    [self enableCallKit:NO forCallManager:mxSession.callManager];
-                }
-            }
-            else
-            {
-                // When there is no call stack, display alerts on call invites
-                [self enableNoVoIPOnMatrixSession:mxSession];
-            }
+            
+            [self configureCallManagerIfRequiredForSession:mxSession];
             
             [self.configuration setupSettingsFor:mxSession];
         }
@@ -2283,6 +2253,9 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     // Reset user pin code
     [PinCodePreferences.shared reset];
     
+    //  Reset push notification manager
+    [PushNotificationManager.shared reset];
+    
 #ifdef MX_CALL_STACK_ENDPOINT
     // Erase all created certificates and private keys by MXEndpointCallStack
     for (MXKAccount *account in MXKAccountManager.sharedManager.accounts)
@@ -2497,6 +2470,55 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
         
         [self->launchAnimationContainerView removeFromSuperview];
         self->launchAnimationContainerView = nil;
+    }
+}
+
+- (void)configureCallManagerIfRequiredForSession:(MXSession *)mxSession
+{
+    if (mxSession.callManager)
+    {
+        //  already configured
+        return;
+    }
+    
+    // Set the VoIP call stack (if supported).
+    id<MXCallStack> callStack;
+    
+#ifdef MX_CALL_STACK_OPENWEBRTC
+    callStack = [[MXOpenWebRTCCallStack alloc] init];
+#endif
+#ifdef MX_CALL_STACK_ENDPOINT
+    callStack = [[MXEndpointCallStack alloc] initWithMatrixId:mxSession.myUser.userId];
+#endif
+#ifdef CALL_STACK_JINGLE
+    callStack = [[MXJingleCallStack alloc] init];
+#endif
+    
+    if (callStack)
+    {
+        [mxSession enableVoIPWithCallStack:callStack];
+        
+        // Setup CallKit
+        if ([MXCallKitAdapter callKitAvailable])
+        {
+            BOOL isCallKitEnabled = [MXKAppSettings standardAppSettings].isCallKitEnabled;
+            [self enableCallKit:isCallKitEnabled forCallManager:mxSession.callManager];
+            
+            // Register for changes performed by the user
+            [[MXKAppSettings standardAppSettings] addObserver:self
+                                                   forKeyPath:@"enableCallKit"
+                                                      options:NSKeyValueObservingOptionNew
+                                                      context:NULL];
+        }
+        else
+        {
+            [self enableCallKit:NO forCallManager:mxSession.callManager];
+        }
+    }
+    else
+    {
+        // When there is no call stack, display alerts on call invites
+        [self enableNoVoIPOnMatrixSession:mxSession];
     }
 }
 
@@ -4532,7 +4554,14 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     // Register "Riot-Defaults.plist" default values
     NSString* userDefaults = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UserDefaults"];
     NSString *defaultsPathFromApp = [[NSBundle mainBundle] pathForResource:userDefaults ofType:@"plist"];
-    NSDictionary *defaults = [NSDictionary dictionaryWithContentsOfFile:defaultsPathFromApp];
+    NSMutableDictionary *defaults = [[NSDictionary dictionaryWithContentsOfFile:defaultsPathFromApp] mutableCopy];
+    
+    //  add pusher ids, as they don't belong to plist anymore
+    defaults[@"pushKitAppIdProd"] = BuildSettings.pushKitAppIdProd;
+    defaults[@"pushKitAppIdDev"] = BuildSettings.pushKitAppIdDev;
+    defaults[@"pusherAppIdProd"] = BuildSettings.pusherAppIdProd;
+    defaults[@"pusherAppIdDev"] = BuildSettings.pusherAppIdDev;
+    
     [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
     
     if (!RiotSettings.shared.isUserDefaultsMigrated)
