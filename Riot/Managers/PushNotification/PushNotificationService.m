@@ -22,16 +22,14 @@
 #import <PushKit/PushKit.h>
 
 @interface PushNotificationService()<PKPushRegistryDelegate>
-{
-    /**
-     Matrix session observer used to detect new opened sessions.
-     */
-    id matrixSessionStateObserver;
-}
 
+/**
+Matrix session observer used to detect new opened sessions.
+*/
+@property (nonatomic, weak) id matrixSessionStateObserver;
 @property (nonatomic, nullable, copy) void (^registrationForRemoteNotificationsCompletion)(NSError *);
 @property (nonatomic, strong) PKPushRegistry *pushRegistry;
-@property (nonatomic, strong) PushNotificationManager *pushNotificationManager;
+@property (nonatomic, strong) PushNotificationStore *pushNotificationStore;
 
 /// Should PushNotificationService receive VoIP pushes
 @property (nonatomic, assign) BOOL shouldReceiveVoIPPushes;
@@ -40,11 +38,11 @@
 
 @implementation PushNotificationService
 
-- (instancetype)initWithPushNotificationManager:(PushNotificationManager *)pushNotificationManager
+- (instancetype)initWithPushNotificationStore:(PushNotificationStore *)pushNotificationStore
 {
     if (self = [super init])
     {
-        self.pushNotificationManager = pushNotificationManager;
+        self.pushNotificationStore = pushNotificationStore;
         _pushRegistry = [[PKPushRegistry alloc] initWithQueue:dispatch_get_main_queue()];
         self.shouldReceiveVoIPPushes = YES;
     }
@@ -104,20 +102,41 @@
 
 - (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken
 {
+    NSLog(@"[PushNotificationService][Push] didRegisterForRemoteNotificationsWithDeviceToken");
+    
     MXKAccountManager* accountManager = [MXKAccountManager sharedManager];
     [accountManager setApnsDeviceToken:deviceToken];
-    //  remove PushKit pusher if exists
+    
+    //  Resurrect old PushKit token to better kill it
+    if (!accountManager.pushDeviceToken)
+    {
+        //  If we don't have the pushDeviceToken, we may have migrated it into the shared user defaults.
+        NSString *pushDeviceToken = [MXKAppSettings.standardAppSettings.sharedUserDefaults objectForKey:@"pushDeviceToken"];
+        if (pushDeviceToken)
+        {
+            NSLog(@"[PushNotificationService][Push] didRegisterForRemoteNotificationsWithDeviceToken: Move PushKit token to user defaults");
+            
+            // Set the token in standard user defaults, as MXKAccount will read it from there when removing the pusher.
+            // This will allow to remove the PushKit pusher in the next step
+            [[NSUserDefaults standardUserDefaults] setObject:pushDeviceToken forKey:@"pushDeviceToken"];
+            
+            [MXKAppSettings.standardAppSettings.sharedUserDefaults removeObjectForKey:@"pushDeviceToken"];
+            [MXKAppSettings.standardAppSettings.sharedUserDefaults removeObjectForKey:@"pushOptions"];
+        }
+    }
+    
+    //  If we already have pushDeviceToken or recovered it in above step, remove its PushKit pusher
     if (accountManager.pushDeviceToken)
     {
-        [accountManager setPushDeviceToken:nil withPushOptions:nil];
+        NSLog(@"[PushNotificationService][Push] didRegisterForRemoteNotificationsWithDeviceToken: A PushKit pusher still exists. Remove it");
+        
+        //  Attempt to remove PushKit pushers explicitly
+        [self clearPushNotificationToken];
     }
-    // Sanity check: Make sure the Pushkit push token is deleted
-    NSParameterAssert(!accountManager.isPushAvailable);
-    NSParameterAssert(!accountManager.pushDeviceToken);
 
     _isPushRegistered = YES;
     
-    if (!_pushNotificationManager.pushKitToken)
+    if (!_pushNotificationStore.pushKitToken)
     {
         [self configurePushKit];
     }
@@ -162,7 +181,7 @@
 
 - (void)applicationDidEnterBackground
 {
-    if (_pushNotificationManager.pushKitToken)
+    if (_pushNotificationStore.pushKitToken)
     {
         self.shouldReceiveVoIPPushes = YES;
     }
@@ -172,11 +191,34 @@
 {
     [[UNUserNotificationCenter currentNotificationCenter] removeUnwantedNotifications];
     [[UNUserNotificationCenter currentNotificationCenter] removeCallNotificationsFor:nil];
-    if (_pushNotificationManager.pushKitToken)
+    if (_pushNotificationStore.pushKitToken)
     {
         self.shouldReceiveVoIPPushes = NO;
     }
 }
+
+- (void)checkPushKitPushersInSession:(MXSession*)session
+{
+    [session.matrixRestClient pushers:^(NSArray<MXPusher *> *pushers) {
+        
+        NSLog(@"[PushNotificationService][Push] checkPushKitPushers: %@ has %@ pushers:", session.myUserId, @(pushers.count));
+        
+        for (MXPusher *pusher in pushers)
+        {
+            NSLog(@"   - %@", pusher.appId);
+            
+            // We do not want anymore PushKit pushers the app used to use
+            if ([pusher.appId isEqualToString:BuildSettings.pushKitAppIdProd]
+                || [pusher.appId isEqualToString:BuildSettings.pushKitAppIdDev])
+            {
+                [self removePusher:pusher inSession:session];
+            }
+        }
+    } failure:^(NSError *error) {
+        NSLog(@"[PushNotificationService][Push] checkPushKitPushers: Error: %@", error);
+    }];
+}
+
 
 #pragma mark - Private Methods
 
@@ -184,7 +226,7 @@
 {
     _shouldReceiveVoIPPushes = shouldReceiveVoIPPushes;
     
-    if (_shouldReceiveVoIPPushes && _pushNotificationManager.pushKitToken)
+    if (_shouldReceiveVoIPPushes && _pushNotificationStore.pushKitToken)
     {
         MXSession *session = [AppDelegate theDelegate].mxSessions.firstObject;
         if (session.state >= MXSessionStateStoreDataReady)
@@ -194,7 +236,11 @@
         else
         {
             //  add an observer for session state
-            matrixSessionStateObserver = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionStateDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notif) {
+            MXWeakify(self);
+
+            NSNotificationCenter * __weak notificationCenter = [NSNotificationCenter defaultCenter];
+            self.matrixSessionStateObserver = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionStateDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notif) {
+                MXStrongifyAndReturnIfNil(self);
                 MXSession *mxSession = (MXSession*)notif.object;
                 
                 if ([[AppDelegate theDelegate].mxSessions containsObject:mxSession]
@@ -202,8 +248,7 @@
                     && self->_shouldReceiveVoIPPushes)
                 {
                     [self configurePushKit];
-                    [[NSNotificationCenter defaultCenter] removeObserver:self->matrixSessionStateObserver];
-                    self->matrixSessionStateObserver = nil;
+                    [notificationCenter removeObserver:self.matrixSessionStateObserver];
                 }
             }];
         }
@@ -220,6 +265,33 @@
     _pushRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
 }
 
+- (void)removePusher:(MXPusher*)pusher inSession:(MXSession*)session
+{
+    NSLog(@"[PushNotificationService][Push] removePusher: %@", pusher.appId);
+    
+    // Shortcut MatrixKit and its complex logic and call directly the API
+    [session.matrixRestClient setPusherWithPushkey:pusher.pushkey
+                                              kind:[NSNull null]    // This is how we remove a pusher
+                                             appId:pusher.appId
+                                    appDisplayName:pusher.appDisplayName
+                                 deviceDisplayName:pusher.deviceDisplayName
+                                        profileTag:pusher.profileTag
+                                              lang:pusher.lang
+                                              data:pusher.data.JSONDictionary
+                                            append:NO
+                                           success:^{
+        NSLog(@"[PushNotificationService][Push] removePusher: Success");
+        
+        // Brute clean remaining MatrixKit data
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"pushDeviceToken"];
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"pushOptions"];
+        
+    } failure:^(NSError *error) {
+        NSLog(@"[PushNotificationService][Push] removePusher: Error: %@", error);
+    }];
+}
+
+
 - (void)launchBackgroundSync
 {
     // Launch a background sync for all existing matrix sessions
@@ -230,15 +302,12 @@
         if (account.mxSession.state == MXSessionStatePaused)
         {
             NSLog(@"[PushNotificationService] launchBackgroundSync");
-            __weak typeof(self) weakSelf = self;
+            MXWeakify(self);
 
             [account backgroundSync:20000 success:^{
                 
                 // Sanity check
-                if (!weakSelf)
-                {
-                    return;
-                }
+                MXStrongifyAndReturnIfNil(self);
                 
                 [[UNUserNotificationCenter currentNotificationCenter] removeUnwantedNotifications];
                 [[UNUserNotificationCenter currentNotificationCenter] removeCallNotificationsFor:nil];
@@ -395,14 +464,10 @@
 - (void)clearPushNotificationToken
 {
     NSLog(@"[PushNotificationService][Push] clearPushNotificationToken: Clear existing token");
-
-    // XXX: The following code has been commented to avoid automatic deactivation of push notifications
-    // There may be a race condition here where the clear happens after the update of the new push token.
-    // We have no evidence of this. This is a safety measure.
-
-    // Clear existing token
-    //MXKAccountManager* accountManager = [MXKAccountManager sharedManager];
-    //[accountManager setPushDeviceToken:nil withPushOptions:nil];
+    
+    // Clear existing pushkit token registered on the HS
+    MXKAccountManager* accountManager = [MXKAccountManager sharedManager];
+    [accountManager setPushDeviceToken:nil withPushOptions:nil];
 }
 
 // Remove delivred notifications for a given room id except call notifications
@@ -450,7 +515,7 @@
 - (void)pushRegistry:(PKPushRegistry *)registry didUpdatePushCredentials:(PKPushCredentials *)pushCredentials forType:(PKPushType)type
 {
     NSLog(@"[PushNotificationService] did update PushKit credentials");
-    _pushNotificationManager.pushKitToken = pushCredentials.token;
+    _pushNotificationStore.pushKitToken = pushCredentials.token;
     if ([UIApplication sharedApplication].applicationState == UIApplicationStateActive)
     {
         self.shouldReceiveVoIPPushes = NO;
@@ -459,7 +524,7 @@
 
 - (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(PKPushType)type withCompletionHandler:(void (^)(void))completion
 {
-    NSLog(@"[PushNotificationService] did receive PushKit push with payload: %@", payload.dictionaryPayload);
+    NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: %@", payload.dictionaryPayload);
     
     NSString *roomId = payload.dictionaryPayload[@"room_id"];
     NSString *eventId = payload.dictionaryPayload[@"event_id"];
@@ -469,14 +534,14 @@
     
     if ([UIApplication sharedApplication].applicationState == UIApplicationStateBackground)
     {
-        NSLog(@"[PushNotificationService] application is in bg");
+        NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: application is in bg");
         
         if (@available(iOS 13.0, *))
         {
             //  for iOS 13, we'll just report the incoming call in the same runloop. It means we cannot call an async API here.
-            MXEvent *lastCallInvite = _pushNotificationManager.lastCallInvite;
+            MXEvent *lastCallInvite = _pushNotificationStore.lastCallInvite;
             //  remove event
-            _pushNotificationManager.lastCallInvite = nil;
+            _pushNotificationStore.lastCallInvite = nil;
             MXSession *session = [AppDelegate theDelegate].mxSessions.firstObject;
             //  when we have a VoIP push while the application is killed, session.callManager will not be ready yet. Configure it.
             [[AppDelegate theDelegate] configureCallManagerIfRequiredForSession:session];
@@ -486,30 +551,26 @@
                 [session decryptEvent:lastCallInvite inTimeline:nil];
             }
             
-            NSLog(@"[PushNotificationService] lastCallInvite: %@", lastCallInvite);
+            NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: lastCallInvite: %@", lastCallInvite);
             
             if ([lastCallInvite.eventId isEqualToString:eventId])
             {
-                SEL handleCallInvite = NSSelectorFromString(@"handleCallInvite:");
-                if ([session.callManager respondsToSelector:handleCallInvite])
-                {
-                    [session.callManager performSelector:handleCallInvite withObject:lastCallInvite];
-                }
+                [session.callManager handleCallEvent:lastCallInvite];
                 MXCall *call = [session.callManager callWithCallId:lastCallInvite.content[@"call_id"]];
                 if (call)
                 {
                     [session.callManager.callKitAdapter reportIncomingCall:call];
-                    NSLog(@"[PushNotificationService] Reporting new call in room %@ for the event: %@", roomId, eventId);
+                    NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: Reporting new call in room %@ for the event: %@", roomId, eventId);
                 }
                 else
                 {
-                    NSLog(@"[PushNotificationService] Error on call object on room %@ for the event: %@", roomId, eventId);
+                    NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: Error on call object on room %@ for the event: %@", roomId, eventId);
                 }
             }
             else
             {
                 //  It's a serious error. There is nothing to avoid iOS to kill us here.
-                NSLog(@"[PushNotificationService] iOS 13 and in bg, but we don't have the last callInvite event for the event %@. There is something wrong.", eventId);
+                NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: iOS 13 and in bg, but we don't have the last callInvite event for the event %@. There is something wrong.", eventId);
             }
         }
         else
@@ -520,7 +581,7 @@
     }
     else
     {
-        NSLog(@"[PushNotificationService] application is not in bg. There is something wrong.");
+        NSLog(@"[PushNotificationService] didReceiveIncomingPushWithPayload: application is not in bg. There is something wrong.");
     }
     
     completion();

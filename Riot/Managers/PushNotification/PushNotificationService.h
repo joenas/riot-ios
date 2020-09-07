@@ -34,8 +34,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)new NS_UNAVAILABLE;
 
 /// Designated initializer
-/// @param pushNotificationManager Push Notification Manager instance
-- (instancetype)initWithPushNotificationManager:(PushNotificationManager *)pushNotificationManager;
+/// @param pushNotificationStore Push Notification Store instance
+- (instancetype)initWithPushNotificationStore:(PushNotificationStore *)pushNotificationStore;
 
 /**
  Is push really registered.
@@ -79,6 +79,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Method to be called when the application becomes active.
 - (void)applicationDidBecomeActive;
+
+/**
+ Make sure the account has no more PushKit pusher.
+ 
+ @param session The session on this account.
+ */
+- (void)checkPushKitPushersInSession:(MXSession*)session;
+
 
 /**
  Remove delivered notifications for a given room id except call notifications

@@ -237,6 +237,7 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
  Related push notification service instance. Will be created when launch finished.
  */
 @property (nonatomic, strong) PushNotificationService *pushNotificationService;
+@property (nonatomic, strong) PushNotificationStore *pushNotificationStore;
 @property (nonatomic, strong) LocalAuthenticationService *localAuthenticationService;
 
 @property (nonatomic, strong) MajorUpdateManager *majorUpdateManager;
@@ -412,23 +413,6 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     NSLog(@"[AppDelegate] didFinishLaunchingWithOptions");
 #endif
 
-    // User credentials (in MXKAccount) are no more stored in NSUserDefaults but in a file
-    // as advised at https://forums.developer.apple.com/thread/15685#45849.
-    // So, there is no more need to loop (sometimes forever) until
-    // [application isProtectedDataAvailable] becomes YES.
-    // But, as we are not so sure, loop but no more than 10s.
-//    // TODO: Remove this loop.
-//    NSUInteger loopCount = 0;
-//
-//    // Check whether the content protection is active before going further.
-//    // Should fix the spontaneous logout.
-//    while (![application isProtectedDataAvailable] && loopCount++ < 50)
-//    {
-//        // Wait for protected data.
-//        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2f]];
-//    }
-//
-//    NSLog(@"[AppDelegate] didFinishLaunchingWithOptions: isProtectedDataAvailable: %@ (%tu)", @([application isProtectedDataAvailable]), loopCount);
     NSLog(@"[AppDelegate] didFinishLaunchingWithOptions: isProtectedDataAvailable: %@", @([application isProtectedDataAvailable]));
 
     _configuration = [AppConfiguration new];
@@ -510,7 +494,8 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
 
     self.localAuthenticationService = [[LocalAuthenticationService alloc] initWithPinCodePreferences:[PinCodePreferences shared]];
 
-    self.pushNotificationService = [[PushNotificationService alloc] initWithPushNotificationManager:PushNotificationManager.shared];
+    self.pushNotificationStore = [PushNotificationStore new];
+    self.pushNotificationService = [[PushNotificationService alloc] initWithPushNotificationStore:self.pushNotificationStore];
     self.pushNotificationService.delegate = self;
     
     // Add matrix observers, and initialize matrix sessions if the app is not launched in background.
@@ -617,13 +602,9 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     [self refreshApplicationIconBadgeNumber];
 
     _isAppForeground = NO;
-<<<<<<< HEAD
-
-=======
     
     [self.pushNotificationService applicationDidEnterBackground];
     
->>>>>>> master
     // Analytics: Force to send the pending actions
     [[DecryptionFailureTracker sharedInstance] dispatch];
     [[Analytics sharedInstance] dispatch];
@@ -1877,6 +1858,8 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
             [self registerNewRequestNotificationForSession:mxSession];
 
             [self checkLocalPrivateKeysInSession:mxSession];
+            
+            [self.pushNotificationService checkPushKitPushersInSession:mxSession];
         }
         else if (mxSession.state == MXSessionStateClosed)
         {
@@ -1996,14 +1979,6 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
 
     // Use MXFileStore as MXStore to permanently store events.
     accountManager.storeClass = [MXFileStore class];
-
-    // Disable APNS use.
-//    if (accountManager.apnsDeviceToken)
-//    {
-//        // We use now Pushkit, unregister for all remote notifications received via Apple Push Notification service.
-//        [[UIApplication sharedApplication] unregisterForRemoteNotifications];
-//        [accountManager setApnsDeviceToken:nil];
-//    }
 
     // Observers have been defined, we can start a matrix session for each enabled accounts.
     NSLog(@"[AppDelegate] initMatrixSessions: prepareSessionForActiveAccounts (app state: %tu)", [[UIApplication sharedApplication] applicationState]);
@@ -2253,8 +2228,8 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
     // Reset user pin code
     [PinCodePreferences.shared reset];
     
-    //  Reset push notification manager
-    [PushNotificationManager.shared reset];
+    //  Reset push notification store
+    [self.pushNotificationStore reset];
     
 #ifdef MX_CALL_STACK_ENDPOINT
     // Erase all created certificates and private keys by MXEndpointCallStack
@@ -2432,7 +2407,9 @@ NSString *const AppDelegateUniversalLinkDidChangeNotification = @"AppDelegateUni
             case MXSessionStateSyncInProgress:
                 // Stay in launching during the first server sync if the store is empty.
                 isLaunching = (mainSession.rooms.count == 0 && launchAnimationContainerView);
+                break;
             default:
+                isLaunching = NO;
                 break;
         }
 
