@@ -241,7 +241,7 @@ PLATFORMS
 
 DEPENDENCIES
   cocoapods (~> 1.9.3)
-  fastlane (~> 2.156.0)
+  fastlane
   fastlane-plugin-versioning
   xcode-install
 
