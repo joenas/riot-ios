@@ -34,7 +34,7 @@
 
 #import "Riot-Swift.h"
 
-@interface RecentsViewController ()
+@interface RecentsViewController () <CreateRoomCoordinatorBridgePresenterDelegate>
 {
     // Tell whether a recents refresh is pending (suspended during editing mode).
     BOOL isRefreshPending;
@@ -65,6 +65,8 @@
     // Observe kThemeServiceDidChangeThemeNotification to handle user interface theme change.
     id kThemeServiceDidChangeThemeNotificationObserver;
 }
+
+@property (nonatomic, strong) CreateRoomCoordinatorBridgePresenter *createRoomCoordinatorBridgePresenter;
 
 @end
 
@@ -997,10 +999,21 @@
         
         __weak typeof(self) weakSelf = self;
         
+        NSString *title, *message;
+        if ([self.mainSession roomWithRoomId:currentRoomId].isDirect)
+        {
+            title = NSLocalizedStringFromTable(@"room_participants_leave_prompt_title_for_dm", @"Vector", nil);
+            message = NSLocalizedStringFromTable(@"room_participants_leave_prompt_msg_for_dm", @"Vector", nil);
+        }
+        else
+        {
+            title = NSLocalizedStringFromTable(@"room_participants_leave_prompt_title", @"Vector", nil);
+            message = NSLocalizedStringFromTable(@"room_participants_leave_prompt_msg", @"Vector", nil);
+        }
+        
         // confirm leave
-        NSString *promptMessage = NSLocalizedStringFromTable(@"room_participants_leave_prompt_msg", @"Vector", nil);
-        currentAlert = [UIAlertController alertControllerWithTitle:NSLocalizedStringFromTable(@"room_participants_leave_prompt_title", @"Vector", nil)
-                                                           message:promptMessage
+        currentAlert = [UIAlertController alertControllerWithTitle:title
+                                                           message:message
                                                     preferredStyle:UIAlertControllerStyleAlert];
         
         [currentAlert addAction:[UIAlertAction actionWithTitle:[NSBundle mxk_localizedStringForKey:@"cancel"]
@@ -1654,7 +1667,7 @@
                                                            typeof(self) self = weakSelf;
                                                            self->currentAlert = nil;
                                                            
-                                                           [self createAnEmptyRoom];
+                                                           [self createNewRoom];
                                                        }
                                                        
                                                    }]];
@@ -1692,76 +1705,14 @@
     [self presentViewController:currentAlert animated:YES completion:nil];
 }
 
-- (void)createAnEmptyRoom
+- (void)createNewRoom
 {
     // Sanity check
     if (self.mainSession)
     {
-        // Create one room at time
-        if (!currentRequest)
-        {
-            [self startActivityIndicator];
-            
-            // Create an empty room.
-            MXWeakify(self);
-            currentRequest = [self.mainSession createRoom:nil
-                                               visibility:kMXRoomDirectoryVisibilityPrivate
-                                                roomAlias:nil
-                                                    topic:nil
-                                                  success:^(MXRoom *room) {
-                                                      MXStrongifyAndReturnIfNil(self);
-                                                      
-                                                      self->currentRequest = nil;
-                                                      [self stopActivityIndicator];
-                                                      if (self->currentAlert)
-                                                      {
-                                                          [self->currentAlert dismissViewControllerAnimated:NO completion:nil];
-                                                          self->currentAlert = nil;
-                                                      }
-
-                                                      [self dispayRoomWithRoomId:room.roomId inMatrixSession:self.mainSession];
-
-                                                  } failure:^(NSError *error) {
-                                                      MXStrongifyAndReturnIfNil(self);
-                                                      
-                                                      self->currentRequest = nil;
-                                                      [self stopActivityIndicator];
-                                                      if (self->currentAlert)
-                                                      {
-                                                          [self->currentAlert dismissViewControllerAnimated:NO completion:nil];
-                                                          self->currentAlert = nil;
-                                                      }
-                                                      
-                                                      NSLog(@"[RecentsViewController] Create new room failed");
-                                                      
-                                                      // Alert user
-                                                      [[AppDelegate theDelegate] showErrorAsAlert:error];
-                                                      
-                                                  }];
-        }
-        else
-        {
-            // Ask the user to wait
-            __weak __typeof(self) weakSelf = self;
-            currentAlert = [UIAlertController alertControllerWithTitle:nil
-                                                               message:NSLocalizedStringFromTable(@"room_creation_wait_for_creation", @"Vector", nil)
-                                                        preferredStyle:UIAlertControllerStyleAlert];
-            
-            [currentAlert addAction:[UIAlertAction actionWithTitle:[NSBundle mxk_localizedStringForKey:@"ok"]
-                                                             style:UIAlertActionStyleDefault
-                                                           handler:^(UIAlertAction * action) {
-                                                               
-                                                               if (weakSelf)
-                                                               {
-                                                                   typeof(self) self = weakSelf;
-                                                                   self->currentAlert = nil;
-                                                               }
-                                                               
-                                                           }]];
-            
-            [currentAlert mxk_setAccessibilityIdentifier:@"RecentsVCRoomCreationInProgressAlert"];
-            [self presentViewController:currentAlert animated:YES completion:nil];
-        }
+        self.createRoomCoordinatorBridgePresenter = [[CreateRoomCoordinatorBridgePresenter alloc] initWithSession:self.mainSession];
+        self.createRoomCoordinatorBridgePresenter.delegate = self;
+        [self.createRoomCoordinatorBridgePresenter presentFrom:self animated:YES];
     }
 }
 
@@ -1932,6 +1883,22 @@
 - (void)searchBarTextDidEndEditing:(UISearchBar *)searchBar
 {
     [self.recentsSearchBar setShowsCancelButton:NO animated:NO];
+}
+
+#pragma mark - CreateRoomCoordinatorBridgePresenterDelegate
+
+- (void)createRoomCoordinatorBridgePresenterDelegate:(CreateRoomCoordinatorBridgePresenter *)coordinatorBridgePresenter didCreateNewRoom:(MXRoom *)room
+{
+    [coordinatorBridgePresenter dismissWithAnimated:YES completion:^{
+        [[AppDelegate theDelegate] showRoom:room.roomId andEventId:nil withMatrixSession:self.mainSession restoreInitialDisplay:NO];
+    }];
+    coordinatorBridgePresenter = nil;
+}
+
+- (void)createRoomCoordinatorBridgePresenterDelegateDidCancel:(CreateRoomCoordinatorBridgePresenter *)coordinatorBridgePresenter
+{
+    [coordinatorBridgePresenter dismissWithAnimated:YES completion:nil];
+    coordinatorBridgePresenter = nil;
 }
 
 @end
