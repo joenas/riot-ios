@@ -16,6 +16,8 @@
 
 import Foundation
 
+import MatrixKit
+
 /// BuildSettings provides settings computed at build time.
 /// In future, it may be automatically generated from xcconfig files
 @objcMembers
@@ -201,6 +203,9 @@ final class BuildSettings: NSObject {
     static let settingsScreenAllowBugReportingManually: Bool = true
     static let settingsScreenAllowDeactivatingAccount: Bool = true
     
+    // MARK: - Timeline settings
+    static let roomInputToolbarCompressionMode = MXKRoomInputToolbarCompressionModePrompt
+    
     // MARK: - Room Settings Screen
     
     static let roomSettingsScreenShowLowPriorityOption: Bool = true
@@ -216,6 +221,8 @@ final class BuildSettings: NSObject {
     static let messageDetailsAllowPermalink: Bool = true
     static let messageDetailsAllowViewSource: Bool = true
     static let messageDetailsAllowSave: Bool = true
+    static let messageDetailsAllowCopyMedia: Bool = true
+    static let messageDetailsAllowPasteMedia: Bool = true
     
     // MARK: - HTTP
     /// Additional HTTP headers will be sent by all requests. Not recommended to use request-specific headers, like `Authorization`.
