@@ -23,6 +23,18 @@ platform :ios do
     xcversion(version: "~> 12.1")
   end
 
+  desc "Upload app to wherever"
+  lane :upload do |options|
+    scp(
+      host: ENV['RUMBLE_UPLOAD_HOST'],
+      username: ENV['RUMBLE_UPLOAD_USER'],
+      upload: {
+        src: options[:file],
+        dst: ENV['RUMBLE_UPLOAD_DEST']
+      }
+    )
+  end
+
   #### Public ####
 
   desc "Builds an adhoc ipa"
